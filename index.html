@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>SAVAGE-XMD - Pairing Code</title>
+</head>
+<body style="font-family:sans-serif;text-align:center;padding:30px;">
+    <h1>🤖 SAVAGE-XMD Pairing Code</h1>
+    <p>This is your live pairing code for WhatsApp</p>
+    <h2 id="code">Fetching pairing code...</h2>
+    <script>
+        fetch('/api/pair')
+            .then(res => res.json())
+            .then(data => {
+                document.getElementById('code').innerText = data.pairingCode || "No code available.";
+            })
+            .catch(err => {
+                document.getElementById('code').innerText = "Error loading code.";
+            });
+    </script>
+</body>
+</html>
