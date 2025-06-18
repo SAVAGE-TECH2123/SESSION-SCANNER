@@ -1,22 +1,42 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <title>SAVAGE-XMD - Pairing Code</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SAVAGE-XMD Session Scanner</title>
 </head>
-<body style="font-family:sans-serif;text-align:center;padding:30px;">
-    <h1>🤖 SAVAGE-XMD Pairing Code</h1>
-    <p>This is your live pairing code for WhatsApp</p>
-    <h2 id="code">Fetching pairing code...</h2>
-    <script>
-        fetch('/api/pair')
-            .then(res => res.json())
-            .then(data => {
-                document.getElementById('code').innerText = data.pairingCode || "No code available.";
-            })
-            .catch(err => {
-                document.getElementById('code').innerText = "Error loading code.";
-            });
-    </script>
+<body style="font-family:sans-serif; text-align:center; padding:40px; background:#111; color:#eee;">
+  <h1>🤖 SAVAGE-XMD Multi-Session Scanner</h1>
+  <p>Enter your allowed phone number to get the WhatsApp pairing code:</p>
+
+  <input type="text" id="numberInput" placeholder="e.g. 255765457691"
+         style="padding:10px; width:250px; border-radius:8px; border:none;" />
+  <br><br>
+  <button onclick="fetchCode()"
+          style="padding:10px 20px; border-radius:6px; background:#00aaff; color:#fff; border:none;">
+    Get Pairing Code
+  </button>
+
+  <h2 id="code" style="margin-top:30px; color:#00ffcc;"></h2>
+
+  <script>
+    function fetchCode() {
+      const number = document.getElementById('numberInput').value.trim();
+
+      if (!number) {
+        alert("Please enter a phone number.");
+        return;
+      }
+
+      fetch('/api/pair?number=' + encodeURIComponent(number))
+        .then(res => res.json())
+        .then(data => {
+          document.getElementById('code').innerText = data.pairingCode || data.error || "No code returned.";
+        })
+        .catch(() => {
+          document.getElementById('code').innerText = "⚠️ Error loading code.";
+        });
+    }
+  </script>
 </body>
 </html>
