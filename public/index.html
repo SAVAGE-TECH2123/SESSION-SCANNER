@@ -2,73 +2,51 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>SAVAGE-XMD Multi-Session Scanner</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>SAVAGE-XMD Scanner</title>
   <style>
-    body {
-      font-family: sans-serif;
-      background: #000;
-      color: #fff;
-      text-align: center;
-      padding: 2em;
-    }
-    input, select, button {
-      padding: 10px;
-      font-size: 16px;
-      margin: 5px;
-      border-radius: 5px;
-    }
-    .code-box {
-      margin-top: 20px;
-    }
-    #qrImage {
-      margin-top: 20px;
-      width: 250px;
-      height: 250px;
-    }
+    body { background:#000; color:#fff; font-family:sans-serif; text-align:center; padding:2em; }
+    input, select, button { padding:10px; margin:5px; font-size:1rem; border-radius:5px; }
+    #result { margin-top:1.5em; }
+    img { max-width:250px; margin-top:1em; }
   </style>
 </head>
 <body>
-  <h1>🤖 SAVAGE-XMD<br>Multi-Session Scanner</h1>
-
+  <h1>🤖 SAVAGE-XMD Multi-Session Scanner</h1>
   <p>Enter your phone number and choose method:</p>
 
   <input type="text" id="number" placeholder="255765457691" />
   <select id="method">
-    <option value="pair">📱 Phone Linking (Pairing Code)</option>
-    <option value="qr">📷 QR Code (Legacy)</option>
+    <option value="pair">📱 Pairing Code</option>
+    <option value="qr">📷 QR Code</option>
   </select>
-
   <br/>
   <button onclick="getCode()">Get Code</button>
 
-  <div class="code-box" id="result">
-    <!-- Pairing or QR will appear here -->
-  </div>
+  <div id="result"></div>
 
   <script>
     async function getCode() {
-      const number = document.getElementById("number").value;
-      const method = document.getElementById("method").value;
-      const resultDiv = document.getElementById("result");
+      const num = document.getElementById('number').value.trim();
+      const method = document.getElementById('method').value;
+      const result = document.getElementById('result');
+      if (!num) return alert('Please enter a phone number.');
 
-      resultDiv.innerHTML = "⏳ Loading code...";
-
+      result.textContent = '⏳ Loading…';
       try {
-        const res = await fetch(`/api/pair?number=${number}&method=${method}`);
+        const res = await fetch(`/api/pair?number=${encodeURIComponent(num)}&method=${method}`);
         const data = await res.json();
-
         if (data.error) {
-          resultDiv.innerHTML = `❌ ${data.error}`;
+          result.innerHTML = `❌ ${data.error}`;
         } else if (data.pairingCode) {
-          resultDiv.innerHTML = `<strong>📲 Pairing Code:</strong><br><code>${data.pairingCode}</code>`;
+          result.innerHTML = `<strong>📲 Pairing Code:</strong><br><code>${data.pairingCode}</code>`;
         } else if (data.qr) {
-          resultDiv.innerHTML = `<strong>📷 Scan QR Code:</strong><br><img id="qrImage" src="${data.qr}" />`;
+          result.innerHTML = `<strong>📷 Scan this QR Code:</strong><br><img src="${data.qr}" alt="QR Code"/>`;
         } else {
-          resultDiv.innerHTML = `⚠️ No data received.`;
+          result.textContent = '⚠️ No data received.';
         }
-      } catch (err) {
-        resultDiv.innerHTML = `❗ Error loading code.`;
+      } catch {
+        result.textContent = '❗ Error loading code.';
       }
     }
   </script>
