@@ -1,30 +1,12 @@
-const express = require('express');
-const fs = require('fs');
-const path = require('path');
-const app = express();
+// server.js const express = require('express'); const path = require('path'); const app = express(); const cors = require('cors'); require('dotenv').config();
 
-const PORT = process.env.PORT || 3000;
+const pairRouter = require('./routes/pair'); const qrRouter = require('./routes/qr');
 
-// Public folder (for index.html and frontend)
-app.use(express.static('public'));
-app.use(express.json());
+app.use(cors()); app.use(express.json()); app.use(express.urlencoded({ extended: true }));
 
-// ✅ Allow bot to fetch session file via HTTP
-app.get('/sessions/:sessionId.json', (req, res) => {
-  const sessionId = req.params.sessionId;
-  const filePath = path.join(__dirname, 'sessions', `${sessionId}.json`);
-  if (fs.existsSync(filePath)) {
-    res.sendFile(filePath);
-  } else {
-    res.status(404).json({ error: 'Session not found' });
-  }
-});
+// Serve public directory app.use(express.static(path.join(__dirname, 'public')));
 
-// Homepage (scanner interface)
-app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
-});
+// Routes app.use('/pair', pairRouter); app.use('/qr', qrRouter);
 
-app.listen(PORT, () => {
-  console.log(`✅ Session scanner running on http://localhost:${PORT}`);
-});
+// Start the server const PORT = process.env.PORT || 10000; app.listen(PORT, () => { console.log(✅ Server running at http://localhost:${PORT}); });
+
