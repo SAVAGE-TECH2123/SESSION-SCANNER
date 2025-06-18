@@ -1,15 +1,15 @@
 const express = require('express');
 const fs = require('fs');
 const path = require('path');
-const { Boom } = require('@hapi/boom');
-const { default: makeWASocket, useSingleFileAuthState } = require('@whiskeysockets/baileys');
-
 const app = express();
+
 const PORT = process.env.PORT || 3000;
+
+// Public folder (for index.html and frontend)
 app.use(express.static('public'));
 app.use(express.json());
 
-// ✅ Allow access to session JSON files
+// ✅ Allow bot to fetch session file via HTTP
 app.get('/sessions/:sessionId.json', (req, res) => {
   const sessionId = req.params.sessionId;
   const filePath = path.join(__dirname, 'sessions', `${sessionId}.json`);
@@ -20,11 +20,11 @@ app.get('/sessions/:sessionId.json', (req, res) => {
   }
 });
 
-// ✅ Simple pairing loader page (optional improvement)
+// Homepage (scanner interface)
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
 app.listen(PORT, () => {
-  console.log(`✅ Scanner backend running at http://localhost:${PORT}`);
+  console.log(`✅ Session scanner running on http://localhost:${PORT}`);
 });
