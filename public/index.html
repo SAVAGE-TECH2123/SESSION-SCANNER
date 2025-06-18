@@ -2,53 +2,36 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>SAVAGE-XMD Scanner</title>
-  <style>
-    body { background:#000; color:#fff; font-family:sans-serif; text-align:center; padding:2em; }
-    input, select, button { padding:10px; margin:5px; font-size:1rem; border-radius:5px; }
-    #result { margin-top:1.5em; }
-    img { max-width:250px; margin-top:1em; }
-  </style>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>SAVAGE-XMD Session Scanner</title>
 </head>
-<body>
-  <h1>🤖 SAVAGE-XMD Multi-Session Scanner</h1>
-  <p>Enter your phone number and choose method:</p>
-
-  <input type="text" id="number" placeholder="255765457691" />
-  <select id="method">
-    <option value="pair">📱 Pairing Code</option>
-    <option value="qr">📷 QR Code</option>
-  </select>
-  <br/>
-  <button onclick="getCode()">Get Code</button>
-
-  <div id="result"></div>
+<body style="font-family:sans-serif;text-align:center;padding:20px">
+  <h1>📡 SAVAGE-XMD SCANNER</h1>
+  <p>Enter your phone number to generate a new session.</p>
+  <form id="sessionForm">
+    <input id="phoneInput" type="text" placeholder="e.g. 255765457691" required />
+    <button type="submit">Start Session</button>
+  </form>
+  <div id="status" style="margin-top:20px;"></div>
 
   <script>
-    async function getCode() {
-      const num = document.getElementById('number').value.trim();
-      const method = document.getElementById('method').value;
-      const result = document.getElementById('result');
-      if (!num) return alert('Please enter a phone number.');
+    const form = document.getElementById('sessionForm');
+    const statusDiv = document.getElementById('status');
 
-      result.textContent = '⏳ Loading…';
-      try {
-        const res = await fetch(`/api/pair?number=${encodeURIComponent(num)}&method=${method}`);
-        const data = await res.json();
-        if (data.error) {
-          result.innerHTML = `❌ ${data.error}`;
-        } else if (data.pairingCode) {
-          result.innerHTML = `<strong>📲 Pairing Code:</strong><br><code>${data.pairingCode}</code>`;
-        } else if (data.qr) {
-          result.innerHTML = `<strong>📷 Scan this QR Code:</strong><br><img src="${data.qr}" alt="QR Code"/>`;
-        } else {
-          result.textContent = '⚠️ No data received.';
-        }
-      } catch {
-        result.textContent = '❗ Error loading code.';
-      }
-    }
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const number = document.getElementById('phoneInput').value;
+      if (!number) return;
+
+      statusDiv.innerHTML = `🔄 Pairing session for <b>${number}</b>...<br/>Open your WhatsApp and pair with code.`;
+
+      // 👇 Optional: integrate pairing initiation if needed
+      // fetch('/start-session', { method: 'POST', body: JSON.stringify({ number }) })
+
+      // 👇 Display session fetch URL for testing
+      const url = `${window.location.origin}/sessions/${number}.json`;
+      statusDiv.innerHTML += `<br/><br/>🌐 Session will be available at:<br/><code>${url}</code>`;
+    });
   </script>
 </body>
 </html>
