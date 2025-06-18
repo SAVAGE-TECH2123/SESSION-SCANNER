@@ -1,15 +1,25 @@
 {
   "name": "savage-xmd-session-backend",
   "version": "1.0.0",
-  "description": "Session scanner and backend for SAVAGE-XMD WhatsApp bot",
+  "description": "SAVAGE-XMD WhatsApp Multi-Session Scanner with QR and Pairing support",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
   },
+  "keywords": [
+    "whatsapp",
+    "scanner",
+    "session",
+    "qrcode",
+    "pairing",
+    "baileys",
+    "whatsapp-web.js"
+  ],
+  "author": "SAVAGE_B.O.Y",
+  "license": "MIT",
   "dependencies": {
     "express": "^4.18.2",
-    "whatsapp-web.js": "^1.21.1",
-    "qrcode-terminal": "^0.12.0",
-    "dotenv": "^16.3.1"
+    "qrcode": "^1.5.1",
+    "whatsapp-web.js": "^1.21.0"
   }
 }
