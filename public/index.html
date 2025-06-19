@@ -6,54 +6,79 @@
   <title>SAVAGE-XMD SCANNER</title>
   <style>
     body {
-      font-family: Arial, sans-serif;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      margin: 0;
+      background: #f5f5f5;
       text-align: center;
-      padding: 50px;
     }
-    input, button {
-      font-size: 16px;
+    h1 {
+      font-size: 2em;
+      margin-bottom: 10px;
+    }
+    input {
       padding: 10px;
+      font-size: 16px;
+      width: 300px;
+      margin: 10px 0;
     }
-    #status {
+    button {
+      padding: 10px 20px;
+      font-size: 16px;
+      background-color: #333;
+      color: white;
+      border: none;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #555;
+    }
+    .qr-container {
       margin-top: 20px;
-      font-size: 18px;
+    }
+    .error {
+      color: red;
+      margin-top: 10px;
     }
   </style>
 </head>
 <body>
-  <h1>📡 SAVAGE-XMD SCANNER</h1>
+  <h1>📡 SAVAGE-XMD<br>SCANNER</h1>
   <p>Enter your phone number to generate a new session.</p>
-  <input type="text" id="number" placeholder="Enter phone number" />
+  <input type="text" id="phoneNumber" placeholder="+255XXXXXXXXX"/>
   <button onclick="startSession()">Start Session</button>
-  <div id="status"></div>
+
+  <div class="qr-container" id="qrCode"></div>
+  <p class="error" id="errorText"></p>
 
   <script>
     async function startSession() {
-      const number = document.getElementById('number').value;
-      const status = document.getElementById('status');
-      status.innerHTML = '⌛ Generating session...';
+      const phone = document.getElementById("phoneNumber").value.trim();
+      const errorText = document.getElementById("errorText");
+      const qrCode = document.getElementById("qrCode");
+      errorText.textContent = "";
+      qrCode.innerHTML = "";
+
+      if (!phone.startsWith("+255") || phone.length < 10) {
+        errorText.textContent = "❌ Invalid Tanzanian number format!";
+        return;
+      }
 
       try {
-        const response = await fetch('/api/pair', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ number })
-        });
-
+        const response = await fetch(`/pair?number=${encodeURIComponent(phone)}`);
         const data = await response.json();
 
-        if (data.qrJsonUrl) {
-          status.innerHTML = `
-            📲 Pairing session for <strong>${number}</strong>...<br/>
-            Open your WhatsApp and pair with code.<br/><br/>
-            🌐 Session will be available at:<br/>
-            <code>https://your-domain.com${data.qrJsonUrl}</code>
-          `;
+        if (data.qr) {
+          qrCode.innerHTML = `<img src="${data.qr}" alt="Scan this QR code"/>`;
         } else {
-          status.innerHTML = '❌ Failed to start session.';
+          errorText.textContent = "❌ QR code not received. Please retry.";
         }
-      } catch (e) {
-        status.innerHTML = '🚫 Error: ' + e.message;
+      } catch (error) {
+        errorText.textContent = "❌ Error: " + error.message;
       }
     }
   </script>
