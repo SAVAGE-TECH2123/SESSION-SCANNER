@@ -16,7 +16,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.use('/pairing', pairingRoute);
 app.use('/qr', qrRoute);
 
-// Fallback to index.html for GET /
+// Fallback to index.html for root
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public/index.html'));
 });
