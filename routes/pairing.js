@@ -1,55 +1,55 @@
 const express = require('express');
+const { makeWASocket, useSingleFileAuthState } = require('@whiskeysockets/baileys');
+const qrcode = require('qrcode');
 const fs = require('fs');
-const { default: makeWASocket, useMultiFileAuthState, fetchLatestBaileysVersion } = require('@whiskeysockets/baileys');
 const path = require('path');
 
 const router = express.Router();
+const sessionsDir = path.join(__dirname, '../../sessions');
 
-const SESSIONS_DIR = path.join(__dirname, '../sessions');
+// Ensure sessions folder exists
+if (!fs.existsSync(sessionsDir)) {
+  fs.mkdirSync(sessionsDir, { recursive: true });
+}
 
-if (!fs.existsSync(SESSIONS_DIR)) fs.mkdirSync(SESSIONS_DIR);
+router.get('/', async (req, res) => {
+  const number = req.query.number;
 
-router.post('/pair', async (req, res) => {
-  const { number } = req.body;
-  if (!number) return res.status(400).json({ error: 'Phone number required' });
+  if (!number) {
+    return res.status(400).json({ error: 'Missing number' });
+  }
 
-  const sessionId = number;
-  const sessionPath = path.join(SESSIONS_DIR, sessionId);
-
-  const { state, saveCreds } = await useMultiFileAuthState(sessionPath);
-  const { version } = await fetchLatestBaileysVersion();
+  const sessionFile = path.join(sessionsDir, `${number}.json`);
+  const { state, saveState } = useSingleFileAuthState(sessionFile);
 
   const sock = makeWASocket({
-    version,
     auth: state,
-    printQRInTerminal: false,
-    generateHighQualityLinkPreview: true,
-    syncFullHistory: false,
-    getMessage: async () => ({ conversation: "Hi" })
+    printQRInTerminal: false
   });
 
-  sock.ev.on('connection.update', (update) => {
-    const { qr, connection } = update;
+  sock.ev.on('connection.update', async (update) => {
+    const { connection, qr } = update;
 
     if (qr) {
-      fs.writeFileSync(
-        path.join(SESSIONS_DIR, `${sessionId}.json`),
-        JSON.stringify({ qr, session: sessionId }, null, 2)
-      );
+      try {
+        const qrImageUrl = await qrcode.toDataURL(qr);
+        return res.json({ qr: qrImageUrl });
+      } catch (err) {
+        return res.status(500).json({ error: 'Failed to generate QR' });
+      }
     }
 
     if (connection === 'open') {
-      console.log(`✅ Session for ${sessionId} connected.`);
-      sock.end();
+      console.log(`✅ Connected: ${number}`);
+      sock.ev.removeAllListeners('connection.update');
+    }
+
+    if (connection === 'close') {
+      console.log(`❌ Disconnected: ${number}`);
     }
   });
 
-  sock.ev.on('creds.update', saveCreds);
-
-  res.json({
-    message: 'Pairing started',
-    qrJsonUrl: `/sessions/${sessionId}.json`
-  });
+  sock.ev.on('creds.update', saveState);
 });
 
 module.exports = router;
