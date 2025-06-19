@@ -1,1 +1,23 @@
-
+{
+  "name": "savage-xmd-session-backend",
+  "version": "1.0.0",
+  "description": "A backend for generating WhatsApp session using pairing code",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "keywords": [
+    "whatsapp",
+    "session",
+    "pairing",
+    "scanner",
+    "baileys"
+  ],
+  "author": "SAVAGE-TECH",
+  "license": "MIT",
+  "dependencies": {
+    "@whiskeysockets/baileys": "^6.6.0",
+    "cors": "^2.8.5",
+    "express": "^4.18.2"
+  }
+}
