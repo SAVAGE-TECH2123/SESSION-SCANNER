@@ -1,50 +1,76 @@
-const { default: makeWASocket, useMultiFileAuthState } = require('@whiskeysockets/baileys');
-const path = require('path');
-const fs = require('fs');
+const {
+  default: makeWASocket,
+  useMultiFileAuthState,
+  fetchLatestBaileysVersion,
+  makeCacheableSignalKeyStore,
+  DisconnectReason,
+  useSingleFileLegacyAuthState,
+  makeInMemoryStore
+} = require("@whiskeysockets/baileys");
+const qrcode = require("qrcode");
+const fs = require("fs");
+const path = require("path");
 
-const allowedNumbers = [
-  '255765457691',
-  '255793157892',
-  '255745830630',
-  '255757858480',
-  '255686169965'
-];
+const sessionsDir = path.join(__dirname, "..", "sessions");
 
-async function startSocket(method, number = '') {
-  if (method === 'pairing' && !allowedNumbers.includes(number)) {
-    throw new Error('This number is not allowed for pairing');
+if (!fs.existsSync(sessionsDir)) {
+  fs.mkdirSync(sessionsDir);
+}
+
+async function startSocket(id, method, phoneNumber) {
+  const sessionPath = path.join(sessionsDir, `${id}`);
+
+  if (!fs.existsSync(sessionPath)) {
+    fs.mkdirSync(sessionPath, { recursive: true });
   }
 
-  const sessionDir = path.join(__dirname, 'sessions', number || `session-${Date.now()}`);
-  fs.mkdirSync(sessionDir, { recursive: true });
-
-  const { state, saveCreds } = await useMultiFileAuthState(sessionDir);
+  const { state, saveCreds } = await useMultiFileAuthState(sessionPath);
+  const { version } = await fetchLatestBaileysVersion();
 
   const sock = makeWASocket({
-    auth: state,
+    version,
+    auth: {
+      creds: state.creds,
+      keys: makeCacheableSignalKeyStore(state.keys, fs.existsSync(sessionPath)),
+    },
     printQRInTerminal: false,
+    syncFullHistory: false,
   });
 
-  sock.ev.on('creds.update', saveCreds);
+  sock.ev.on("creds.update", saveCreds);
 
   return new Promise((resolve, reject) => {
-    sock.ev.on('connection.update', (update) => {
-      const { qr, pairingCode, connection } = update;
+    sock.ev.on("connection.update", async (update) => {
+      const { connection, qr } = update;
 
-      if (connection === 'open') {
-        return resolve({ success: true });
+      if (qr && method === "QRCode") {
+        try {
+          const qrImage = await qrcode.toDataURL(qr);
+          resolve({ status: "QR", image: qrImage });
+        } catch (err) {
+          reject({ error: "Failed to generate QR code." });
+        }
       }
 
-      if (connection === 'close') {
-        return reject(new Error('Connection closed'));
+      if (method === "PairingCode" && connection === "open") {
+        resolve({ status: "CONNECTED", message: "Paired successfully." });
       }
 
-      if (method === 'qr' && qr) {
-        return resolve({ success: true, qr });
+      if (update.pairingCode && method === "PairingCode") {
+        resolve({
+          status: "PAIRING",
+          code: update.pairingCode,
+        });
       }
 
-      if (method === 'pairing' && pairingCode) {
-        return resolve({ success: true, code: pairingCode });
+      if (connection === "close") {
+        const reason = update.lastDisconnect?.error?.output?.statusCode;
+        if (reason !== DisconnectReason.loggedOut) {
+          console.log("Reconnecting...");
+          startSocket(id, method, phoneNumber);
+        } else {
+          reject({ error: "Disconnected and logged out." });
+        }
       }
     });
   });
