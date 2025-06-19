@@ -1,56 +1,51 @@
-const express = require('express');
-const fs = require('fs');
-const path = require('path');
-const { Client, RemoteAuth, LocalAuth, NoAuth } = require('whatsapp-web.js');
-const { RemoteAuthHandler } = require('whatsapp-web.js/src/authStrategies/remote');
-const { MongoStore } = require('wwebjs-mongo');
-const qrcode = require('qrcode-terminal');
+// pairing.js (inside routes)
+
+const express = require('express'); const { Client, RemoteAuth } = require('whatsapp-web.js'); const { MongoStore } = require('wwebjs-mongo'); const { generateWId } = require('whatsapp-web.js/src/util'); const { default: mongoose } = require('mongoose'); const fs = require('fs'); const path = require('path');
 
 const router = express.Router();
 
-router.get('/:number', async (req, res) => {
-  const number = req.params.number;
+const mongoUrl = process.env.MONGO_URI || 'mongodb://localhost:27017/savage-sessions'; mongoose.connect(mongoUrl);
 
-  // Validate number
-  if (!/^\d+$/.test(number)) {
-    return res.status(400).json({ error: 'Invalid phone number format.' });
-  }
+const store = new MongoStore({ mongoose: mongoose });
 
-  const sessionPath = path.join(__dirname, '..', 'sessions', `${number}.json`);
+const clients = new Map();
 
-  // Remove old session if exists
-  if (fs.existsSync(sessionPath)) {
-    fs.unlinkSync(sessionPath);
-  }
+router.post('/start', async (req, res) => { const { number } = req.body; if (!number) return res.status(400).json({ error: 'Phone number required' });
 
-  const client = new Client({
-    authStrategy: new NoAuth(),
+const sessionId = number;
+
+const client = new Client({
+    authStrategy: new RemoteAuth({
+        store: store,
+        backupSyncIntervalMs: 300000,
+        clientId: sessionId
+    }),
     puppeteer: {
-      headless: true,
-      args: ['--no-sandbox', '--disable-setuid-sandbox']
+        headless: true,
+        args: ['--no-sandbox', '--disable-setuid-sandbox']
     }
-  });
+});
 
-  client.on('qr', async qr => {
-    const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(qr)}&size=300x300`;
-    res.send(`
-      <h2>🤖 SAVAGE-XMD SCANNER</h2>
-      <p>Scan this QR code with the WhatsApp account of: <b>${number}</b></p>
-      <img src="${qrImageUrl}" alt="QR Code" />
-      <p>Session will be saved automatically after pairing.</p>
-    `);
-  });
+clients.set(sessionId, client);
 
-  client.on('authenticated', async (session) => {
-    fs.writeFileSync(sessionPath, JSON.stringify(session));
-    console.log(`✅ Session saved for ${number}`);
-  });
+client.on('qr', qr => {
+    const qrPath = path.join(__dirname, `../sessions/${sessionId}.qr`);
+    fs.writeFileSync(qrPath, qr);
+});
 
-  client.on('ready', () => {
-    console.log(`Client is ready for ${number}`);
-  });
+client.on('ready', () => {
+    console.log(`Client ${sessionId} is ready.`);
+});
 
-  client.initialize();
+client.on('authenticated', () => {
+    console.log(`Client ${sessionId} authenticated.`);
+});
+
+client.initialize();
+
+res.json({ message: `Pairing session for ${sessionId} started.` });
+
 });
 
 module.exports = router;
+
