@@ -1,10 +1,31 @@
-// 📁 server.js const express = require('express'); const cors = require('cors'); const path = require('path');
+const express = require('express');
+const cors = require('cors');
+const path = require('path');
 
-const app = express(); const PORT = process.env.PORT || 3000;
+const app = express();
+const PORT = process.env.PORT || 3000;
 
-app.use(cors()); app.use(express.json()); app.use(express.static(path.join(__dirname, 'public')));
+// Middleware
+app.use(cors());
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
-// Simple pairing endpoint app.post('/generate-session', (req, res) => { const { number } = req.body; if (!number) return res.status(400).json({ error: 'Phone number is required' }); res.json({ message: Session generated for ${number} }); });
+// Serve static files from the public folder
+app.use(express.static(path.join(__dirname, 'public')));
 
-app.listen(PORT, () => { console.log(✅ Server running on http://localhost:${PORT}); });
+// Load API routes
+const pairingRoutes = require('./src/routes/pairing');
+const qrRoutes = require('./src/routes/qr');
 
+app.use('/pair', pairingRoutes);
+app.use('/api/qr', qrRoutes);
+
+// Fallback for SPA routing
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+// Start the server
+app.listen(PORT, () => {
+  console.log(`✅ Server running on port ${PORT}`);
+});
