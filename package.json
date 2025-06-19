@@ -9,7 +9,8 @@
   "dependencies": {
     "cors": "^2.8.5",
     "express": "^4.18.2",
-    "whatsapp-web.js": "^1.23.0"
+    "whatsapp-web.js": "^1.23.0",
+    "@whiskeysockets/baileys": "^6.6.0"
   },
   "keywords": [],
   "author": "SAVAGE_B.O.Y",
