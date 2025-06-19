@@ -2,117 +2,134 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>SAVAGE-XMD Session Scanner</title>
   <style>
     body {
-      background-color: #111;
-      color: white;
       font-family: 'Segoe UI', sans-serif;
+      background-color: #111;
+      color: #eee;
       text-align: center;
-      padding: 20px;
+      padding: 30px;
     }
     h1 {
-      color: red;
-      font-size: 28px;
+      color: #ff1e1e;
     }
-    select, input {
-      padding: 10px;
+    .logo {
+      width: 100px;
+      border-radius: 50%;
+      margin-bottom: 20px;
+    }
+    .container {
+      background-color: #1c1c1c;
+      padding: 20px;
+      border-radius: 12px;
+      display: inline-block;
+      width: 90%;
+      max-width: 400px;
+      box-shadow: 0 0 10px #ff1e1e;
+    }
+    input, select, button {
+      width: 100%;
+      padding: 12px;
+      margin: 10px 0;
+      border-radius: 8px;
+      border: none;
       font-size: 16px;
-      margin: 10px;
     }
     button {
-      background-color: red;
+      background-color: #ff1e1e;
       color: white;
-      padding: 10px 20px;
-      font-size: 16px;
-      border: none;
       cursor: pointer;
-      border-radius: 8px;
     }
-    .error {
-      color: red;
-      font-weight: bold;
+    button:hover {
+      background-color: #e60000;
     }
-    .success {
-      color: green;
-      font-weight: bold;
-    }
-    #qrDisplay img {
-      width: 250px;
+    #result, #qrImage {
       margin-top: 20px;
+      word-break: break-word;
     }
   </style>
 </head>
 <body>
-  <img src="logo.png" alt="SAVAGE-XMD Logo" style="width: 150px; border-radius: 12px;" />
+
+  <img class="logo" src="https://files.catbox.moe/jqvqj2.jpeg" alt="Logo" />
   <h1>SAVAGE-XMD Session Scanner</h1>
 
-  <p>Choose login method:</p>
-  <select id="method">
-    <option value="pairing">Pairing Code</option>
-    <option value="qr">QR Code</option>
-  </select>
+  <div class="container">
+    <select id="method">
+      <option value="PairingCode">Pairing Code</option>
+      <option value="QRCode">QR Code</option>
+    </select>
 
-  <div id="pairingInput">
-    <input type="text" id="number" placeholder="Enter your allowed phone number" />
+    <input type="text" id="number" placeholder="Enter allowed number..." />
+    <button onclick="startSession()">Start Session</button>
+
+    <div id="result"></div>
+    <img id="qrImage" src="" style="display:none; max-width:100%;" />
   </div>
 
-  <button onclick="startSession()">Start Session</button>
-
-  <p class="success" id="output"></p>
-  <p class="error" id="error"></p>
-  <div id="qrDisplay"></div>
-
   <script>
-    const methodSelect = document.getElementById('method');
-    const pairingInput = document.getElementById('pairingInput');
-
-    methodSelect.addEventListener('change', () => {
-      pairingInput.style.display = methodSelect.value === 'pairing' ? 'block' : 'none';
-    });
+    const allowedNumbers = [
+      "255765457691",
+      "+255793157892",
+      "255745830630",
+      "+255757858480",
+      "+255686169965"
+    ];
 
     async function startSession() {
-      const method = document.getElementById('method').value;
-      const number = document.getElementById('number')?.value || '';
-      const output = document.getElementById('output');
-      const error = document.getElementById('error');
-      const qrDisplay = document.getElementById('qrDisplay');
+      const method = document.getElementById("method").value;
+      const number = document.getElementById("number").value.trim();
+      const result = document.getElementById("result");
+      const qrImage = document.getElementById("qrImage");
 
-      output.textContent = '';
-      error.textContent = '';
-      qrDisplay.innerHTML = '';
+      result.innerText = "Please wait...";
+      qrImage.style.display = "none";
+      qrImage.src = "";
+
+      if (method === "PairingCode" && !allowedNumbers.includes(number)) {
+        result.innerText = "Number not allowed!";
+        return;
+      }
+
+      const payload = { method };
+      if (method === "PairingCode") payload.number = number;
 
       try {
-        const response = await fetch('/pairing/start', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ number, method })
+        const response = await fetch("/api/start-session", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
         });
 
         const data = await response.json();
 
-        if (data.success) {
-          if (method === 'pairing') {
-            output.textContent = `✅ Pairing Code: ${data.code}`;
-            output.className = 'success';
-          } else if (method === 'qr') {
-            const qr = document.createElement('img');
-            qr.src = data.qr;
-            qrDisplay.appendChild(qr);
-          }
-        } else {
-          error.textContent = `❌ ${data.message}`;
+        if (data.code) {
+          result.innerHTML = `<strong>Pairing Code:</strong> ${data.code}`;
+        } else if (data.qr) {
+          qrImage.src = data.qr;
+          qrImage.style.display = "block";
+          result.innerText = "Scan the QR code using WhatsApp";
+        } else if (data.message) {
+          result.innerText = data.message;
+        } else if (data.error) {
+          result.innerText = `Error: ${data.error}`;
         }
       } catch (err) {
-        error.textContent = '❌ Failed to generate session.';
+        result.innerText = "Request failed. See console.";
+        console.error(err);
       }
     }
 
-    // Initial setup
-    if (methodSelect.value === 'qr') {
-      pairingInput.style.display = 'none';
-    }
+    // Toggle number input visibility
+    document.getElementById("method").addEventListener("change", function () {
+      const input = document.getElementById("number");
+      input.style.display = this.value === "PairingCode" ? "block" : "none";
+    });
+
+    // Trigger initial change
+    document.getElementById("method").dispatchEvent(new Event("change"));
   </script>
 </body>
 </html>
