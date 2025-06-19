@@ -1,57 +1,61 @@
-const {
-  default: makeWASocket,
-  useSingleFileAuthState,
-  DisconnectReason,
-  makeInMemoryStore,
-  fetchLatestBaileysVersion,
-} = require('@whiskeysockets/baileys');
-const { Boom } = require('@hapi/boom');
+const { default: makeWASocket, useSingleFileAuthState, DisconnectReason } = require('@whiskeysockets/baileys');
 const fs = require('fs');
 const path = require('path');
+const P = require('pino');
+const { Boom } = require('@hapi/boom');
 
-// Store WhatsApp sessions
-const sessions = new Map();
+// Save sessions in /session/auth_data/
+const sessionFolder = path.join(__dirname, './auth_data');
+if (!fs.existsSync(sessionFolder)) fs.mkdirSync(sessionFolder, { recursive: true });
 
+/**
+ * Starts a WhatsApp socket and returns a pairing code for login
+ * @param {string} number - the phone number to create a session for
+ * @returns {Promise<string>} - pairing code
+ */
 async function startSocket(number) {
-  const sessionDir = path.join(__dirname, 'sessions');
-  if (!fs.existsSync(sessionDir)) fs.mkdirSync(sessionDir);
-
-  const sessionFile = path.join(sessionDir, `${number}.json`);
-  const { state, saveState } = useSingleFileAuthState(sessionFile);
-
-  const { version, isLatest } = await fetchLatestBaileysVersion();
-
   return new Promise((resolve, reject) => {
+    const sessionFile = path.join(sessionFolder, `${number}.json`);
+    const { state, saveState } = useSingleFileAuthState(sessionFile);
+
     const sock = makeWASocket({
-      version,
       auth: state,
       printQRInTerminal: false,
-      browser: ['SAVAGE-XMD', 'Safari', '1.0.0']
+      logger: P({ level: 'silent' }),
+      browser: ['SAVAGE-XMD', 'Chrome', '1.0.0']
+    });
+
+    let resolved = false;
+
+    sock.ev.on('connection.update', (update) => {
+      const { connection, lastDisconnect, pairingCode } = update;
+
+      if (pairingCode && !resolved) {
+        resolved = true;
+        return resolve(pairingCode);
+      }
+
+      if (connection === 'open') {
+        console.log(`✅ Connected: ${number}`);
+      }
+
+      if (
+        connection === 'close' &&
+        lastDisconnect &&
+        lastDisconnect.error instanceof Boom &&
+        lastDisconnect.error.output.statusCode !== DisconnectReason.loggedOut
+      ) {
+        sock.restart();
+      }
     });
 
     sock.ev.on('creds.update', saveState);
 
-    sock.ev.on('connection.update', (update) => {
-      const { connection, qr, pairingCode, lastDisconnect } = update;
-
-      if (connection === 'close') {
-        const reason = new Boom(lastDisconnect?.error)?.output?.statusCode;
-        if (reason === DisconnectReason.loggedOut) {
-          fs.unlinkSync(sessionFile);
-        }
-        reject('Connection closed. Try again.');
+    setTimeout(() => {
+      if (!resolved) {
+        reject(new Error('⏱️ Timed out waiting for pairing code.'));
       }
-
-      if (pairingCode) {
-        // Save session instance
-        sessions.set(number, sock);
-        resolve(pairingCode);
-      }
-
-      if (qr) {
-        console.log(`📸 QR Code (not used in UI): ${qr}`);
-      }
-    });
+    }, 20000); // 20s timeout
   });
 }
 
