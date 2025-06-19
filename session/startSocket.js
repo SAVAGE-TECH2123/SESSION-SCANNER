@@ -1,27 +1,58 @@
-const { default: makeWASocket, useSingleFileAuthState } = require('@whiskeysockets/baileys');
-const { writeFileSync, existsSync, mkdirSync } = require('fs');
-const { join } = require('path');
+const {
+  default: makeWASocket,
+  useSingleFileAuthState,
+  DisconnectReason,
+  makeInMemoryStore,
+  fetchLatestBaileysVersion,
+} = require('@whiskeysockets/baileys');
+const { Boom } = require('@hapi/boom');
+const fs = require('fs');
+const path = require('path');
 
-const sessionPath = './session';
-if (!existsSync(sessionPath)) mkdirSync(sessionPath);
+// Store WhatsApp sessions
+const sessions = new Map();
 
 async function startSocket(number) {
-    return new Promise((resolve, reject) => {
-        const sessionFile = join(sessionPath, `${number}.json`);
-        const { state, saveState } = useSingleFileAuthState(sessionFile);
-        
-        const sock = makeWASocket({
-            auth: state
-        });
+  const sessionDir = path.join(__dirname, 'sessions');
+  if (!fs.existsSync(sessionDir)) fs.mkdirSync(sessionDir);
 
-        sock.ev.on('creds.update', saveState);
+  const sessionFile = path.join(sessionDir, `${number}.json`);
+  const { state, saveState } = useSingleFileAuthState(sessionFile);
 
-        sock.ev.on('connection.update', ({ connection, lastDisconnect, qr, pairingCode }) => {
-            if (qr) console.log(`🟡 QR: ${qr}`);
-            if (pairingCode) resolve(pairingCode);
-            if (connection === 'close') reject(lastDisconnect?.error || new Error('Connection closed'));
-        });
+  const { version, isLatest } = await fetchLatestBaileysVersion();
+
+  return new Promise((resolve, reject) => {
+    const sock = makeWASocket({
+      version,
+      auth: state,
+      printQRInTerminal: false,
+      browser: ['SAVAGE-XMD', 'Safari', '1.0.0']
     });
+
+    sock.ev.on('creds.update', saveState);
+
+    sock.ev.on('connection.update', (update) => {
+      const { connection, qr, pairingCode, lastDisconnect } = update;
+
+      if (connection === 'close') {
+        const reason = new Boom(lastDisconnect?.error)?.output?.statusCode;
+        if (reason === DisconnectReason.loggedOut) {
+          fs.unlinkSync(sessionFile);
+        }
+        reject('Connection closed. Try again.');
+      }
+
+      if (pairingCode) {
+        // Save session instance
+        sessions.set(number, sock);
+        resolve(pairingCode);
+      }
+
+      if (qr) {
+        console.log(`📸 QR Code (not used in UI): ${qr}`);
+      }
+    });
+  });
 }
 
 module.exports = startSocket;
