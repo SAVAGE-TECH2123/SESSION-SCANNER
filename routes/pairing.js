@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const startSocket = require('../sessions/startSocket');
+const startSocket = require('../session/startSocket');
 
 const allowedNumbers = [
   "255765457691",
