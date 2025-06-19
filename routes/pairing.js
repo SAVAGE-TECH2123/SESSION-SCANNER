@@ -1,51 +1,55 @@
-// pairing.js (inside routes)
-
-const express = require('express'); const { Client, RemoteAuth } = require('whatsapp-web.js'); const { MongoStore } = require('wwebjs-mongo'); const { generateWId } = require('whatsapp-web.js/src/util'); const { default: mongoose } = require('mongoose'); const fs = require('fs'); const path = require('path');
+const express = require('express');
+const fs = require('fs');
+const { default: makeWASocket, useMultiFileAuthState, fetchLatestBaileysVersion } = require('@whiskeysockets/baileys');
+const path = require('path');
 
 const router = express.Router();
 
-const mongoUrl = process.env.MONGO_URI || 'mongodb://localhost:27017/savage-sessions'; mongoose.connect(mongoUrl);
+const SESSIONS_DIR = path.join(__dirname, '../sessions');
 
-const store = new MongoStore({ mongoose: mongoose });
+if (!fs.existsSync(SESSIONS_DIR)) fs.mkdirSync(SESSIONS_DIR);
 
-const clients = new Map();
+router.post('/pair', async (req, res) => {
+  const { number } = req.body;
+  if (!number) return res.status(400).json({ error: 'Phone number required' });
 
-router.post('/start', async (req, res) => { const { number } = req.body; if (!number) return res.status(400).json({ error: 'Phone number required' });
+  const sessionId = number;
+  const sessionPath = path.join(SESSIONS_DIR, sessionId);
 
-const sessionId = number;
+  const { state, saveCreds } = await useMultiFileAuthState(sessionPath);
+  const { version } = await fetchLatestBaileysVersion();
 
-const client = new Client({
-    authStrategy: new RemoteAuth({
-        store: store,
-        backupSyncIntervalMs: 300000,
-        clientId: sessionId
-    }),
-    puppeteer: {
-        headless: true,
-        args: ['--no-sandbox', '--disable-setuid-sandbox']
+  const sock = makeWASocket({
+    version,
+    auth: state,
+    printQRInTerminal: false,
+    generateHighQualityLinkPreview: true,
+    syncFullHistory: false,
+    getMessage: async () => ({ conversation: "Hi" })
+  });
+
+  sock.ev.on('connection.update', (update) => {
+    const { qr, connection } = update;
+
+    if (qr) {
+      fs.writeFileSync(
+        path.join(SESSIONS_DIR, `${sessionId}.json`),
+        JSON.stringify({ qr, session: sessionId }, null, 2)
+      );
     }
-});
 
-clients.set(sessionId, client);
+    if (connection === 'open') {
+      console.log(`✅ Session for ${sessionId} connected.`);
+      sock.end();
+    }
+  });
 
-client.on('qr', qr => {
-    const qrPath = path.join(__dirname, `../sessions/${sessionId}.qr`);
-    fs.writeFileSync(qrPath, qr);
-});
+  sock.ev.on('creds.update', saveCreds);
 
-client.on('ready', () => {
-    console.log(`Client ${sessionId} is ready.`);
-});
-
-client.on('authenticated', () => {
-    console.log(`Client ${sessionId} authenticated.`);
-});
-
-client.initialize();
-
-res.json({ message: `Pairing session for ${sessionId} started.` });
-
+  res.json({
+    message: 'Pairing started',
+    qrJsonUrl: `/sessions/${sessionId}.json`
+  });
 });
 
 module.exports = router;
-
