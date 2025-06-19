@@ -2,69 +2,98 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>SAVAGE-XMD SCANNER</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>SAVAGE-XMD | Session Scanner</title>
   <style>
     body {
-      font-family: Arial, sans-serif;
-      background: #1b1b1b;
-      color: white;
-      text-align: center;
-      padding: 50px;
+      margin: 0;
+      font-family: 'Segoe UI', sans-serif;
+      background-color: #111;
+      color: #fff;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 40px 20px;
     }
     img {
       width: 120px;
+      border-radius: 12px;
       margin-bottom: 20px;
+      box-shadow: 0 0 20px red;
     }
-    input {
-      padding: 10px;
-      width: 250px;
-      font-size: 16px;
+    h1 {
+      color: #ff0000;
+      font-size: 26px;
       margin-bottom: 10px;
     }
-    button {
-      padding: 10px 20px;
+    input {
+      padding: 12px;
       font-size: 16px;
-      background: red;
+      width: 280px;
+      max-width: 90%;
+      border: none;
+      outline: none;
+      border-radius: 8px;
+      margin-bottom: 15px;
+    }
+    button {
+      background-color: red;
       color: white;
       border: none;
+      padding: 12px 28px;
+      border-radius: 8px;
+      font-size: 16px;
       cursor: pointer;
     }
     .error {
-      color: red;
-      margin-top: 10px;
+      margin-top: 15px;
+      color: #ff4d4d;
     }
   </style>
 </head>
 <body>
   <img src="logo.png" alt="SAVAGE-XMD Logo" />
-  <h1>SAVAGE-XMD SESSION SCANNER</h1>
-  <p>Enter your allowed phone number to generate a new session:</p>
-  <input id="number" placeholder="e.g. 255765457691" />
-  <button onclick="startSession()">Start Session</button>
+  <h1>SAVAGE-XMD Session Scanner</h1>
+  <p>Enter your allowed phone number below:</p>
+  <input type="text" id="number" placeholder="2557xxxxxxxx" />
+  <br/>
+  <button onclick="startSession()">Generate Pairing Code</button>
   <p class="error" id="error"></p>
 
   <script>
+    const allowedNumbers = [
+      '255765457691',
+      '+255793157892',
+      '255745830630',
+      '+255757858480',
+      '+255686169965'
+    ];
+
     async function startSession() {
-      const number = document.getElementById('number').value;
+      const number = document.getElementById('number').value.trim();
       const errorEl = document.getElementById('error');
-      errorEl.textContent = '';
+      errorEl.innerText = '';
+
+      if (!allowedNumbers.includes(number)) {
+        errorEl.innerText = '❌ This number is not authorized.';
+        return;
+      }
 
       try {
-        const response = await fetch('/pairing', {
+        const res = await fetch('/pairing', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ number })
         });
-        const data = await response.json();
+        const data = await res.json();
 
         if (data.pairingCode) {
-          alert("🔗 Pairing Code: " + data.pairingCode);
+          alert(`✅ Pairing Code: ${data.pairingCode}`);
         } else {
-          throw new Error(data.error || "Unknown error");
+          throw new Error(data.error || 'Something went wrong');
         }
       } catch (err) {
-        errorEl.textContent = "❌ Error: " + err.message;
+        errorEl.innerText = `❌ ${err.message}`;
       }
     }
   </script>
