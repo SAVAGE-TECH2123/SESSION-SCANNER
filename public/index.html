@@ -12,38 +12,46 @@
       text-align: center;
       padding: 20px;
     }
+
     h1 {
       color: red;
     }
+
     select, input {
       padding: 10px;
       font-size: 16px;
       margin: 10px;
-      border-radius: 8px;
+      border-radius: 6px;
       border: none;
     }
+
     button {
       background-color: red;
       color: white;
       padding: 10px 20px;
       font-size: 16px;
       border: none;
-      border-radius: 8px;
+      border-radius: 6px;
       cursor: pointer;
-      margin-top: 10px;
     }
+
     .error, .success {
       margin-top: 10px;
       font-weight: bold;
     }
+
     .error {
       color: red;
     }
+
     .success {
       color: green;
     }
-    img {
-      margin: 20px auto;
+
+    #qrDisplay img {
+      margin-top: 15px;
+      border: 2px solid #fff;
+      border-radius: 10px;
     }
   </style>
 </head>
@@ -65,7 +73,6 @@
 
   <p class="error" id="error"></p>
   <p class="success" id="output"></p>
-
   <div id="qrDisplay"></div>
 
   <script>
@@ -78,8 +85,7 @@
 
     async function startSession() {
       const method = document.getElementById('method').value;
-      const numberInput = document.getElementById('number');
-      const number = numberInput ? numberInput.value : '';
+      const number = document.getElementById('number').value;
       const output = document.getElementById('output');
       const error = document.getElementById('error');
       const qrDisplay = document.getElementById('qrDisplay');
@@ -88,10 +94,8 @@
       error.textContent = '';
       qrDisplay.innerHTML = '';
 
-      const endpoint = method === 'pairing' ? '/pairing/start' : '/qr/start';
-
       try {
-        const response = await fetch(endpoint, {
+        const response = await fetch('/pairing/start', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ number, method })
@@ -101,7 +105,7 @@
 
         if (data.success) {
           if (method === 'pairing') {
-            output.textContent = '✔️ Pairing Code: ' + data.code;
+            output.textContent = `✅ Pairing Code: ${data.code}`;
             output.className = 'success';
           } else if (method === 'qr') {
             const qr = document.createElement('img');
@@ -110,7 +114,7 @@
             qrDisplay.appendChild(qr);
           }
         } else {
-          error.textContent = '❌ ' + data.message;
+          error.textContent = `❌ ${data.message}`;
         }
       } catch (err) {
         error.textContent = '❌ Failed to generate session.';
