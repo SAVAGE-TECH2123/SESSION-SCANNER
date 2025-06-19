@@ -1,14 +1,61 @@
-// routes/qr.js const express = require('express'); const fs = require('fs'); const path = require('path'); const { default: makeWASocket, useSingleFileAuthState } = require('@whiskeysockets/baileys'); const { toDataURL } = require('qrcode');
+const express = require('express');
+const { Client, NoAuth } = require('whatsapp-web.js');
+const fs = require('fs');
+const path = require('path');
 
 const router = express.Router();
 
-router.get('/:number', async (req, res) => { const number = req.params.number; const sessionFile = path.join(__dirname, ../sessions/${number}.json);
+router.get('/:number', async (req, res) => {
+  const number = req.params.number;
 
-if (!fs.existsSync('./sessions')) fs.mkdirSync('./sessions');
+  // Validate input
+  if (!number || !/^\d+$/.test(number)) {
+    return res.status(400).send('Invalid phone number.');
+  }
 
-const { state, saveState } = useSingleFileAuthState(sessionFile); const sock = makeWASocket({ auth: state });
+  const sessionFile = path.join(__dirname, '..', 'sessions', `${number}.json`);
 
-let sent = false; sock.ev.on('creds.update', saveState); sock.ev.on('connection.update', async ({ connection, lastDisconnect, qr }) => { if (qr && !sent) { sent = true; const qrImage = await toDataURL(qr); return res.json({ qr: qrImage }); } if (connection === 'open') { console.log(✅ QR Session connected for ${number}); } if (connection === 'close') { console.log(❌ QR connection closed for ${number}); } }); });
+  // Remove old session if exists
+  if (fs.existsSync(sessionFile)) {
+    fs.unlinkSync(sessionFile);
+  }
+
+  const client = new Client({
+    authStrategy: new NoAuth(),
+    puppeteer: {
+      headless: true,
+      args: ['--no-sandbox', '--disable-setuid-sandbox']
+    }
+  });
+
+  client.on('qr', qr => {
+    const qrURL = `https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(qr)}&size=300x300`;
+
+    res.send(`
+      <html>
+        <head>
+          <title>SAVAGE-XMD QR Scanner</title>
+        </head>
+        <body style="background:#000;color:#fff;text-align:center;font-family:sans-serif;">
+          <h1>🤖 SAVAGE-XMD</h1>
+          <p>QR Pairing for: <strong>${number}</strong></p>
+          <img src="${qrURL}" alt="QR Code"/>
+          <p>Scan using WhatsApp and wait for pairing...</p>
+        </body>
+      </html>
+    `);
+  });
+
+  client.on('authenticated', (session) => {
+    fs.writeFileSync(sessionFile, JSON.stringify(session));
+    console.log(`✅ Session saved for ${number}`);
+  });
+
+  client.on('ready', () => {
+    console.log(`Client is ready for ${number}`);
+  });
+
+  client.initialize();
+});
 
 module.exports = router;
-
