@@ -1,62 +1,58 @@
-const { default: makeWASocket, useSingleFileAuthState, DisconnectReason } = require('@whiskeysockets/baileys');
+const {
+  default: makeWASocket,
+  useSingleFileAuthState,
+  fetchLatestBaileysVersion,
+  makeInMemoryStore,
+  DisconnectReason
+} = require('@whiskeysockets/baileys');
 const fs = require('fs');
 const path = require('path');
-const P = require('pino');
-const { Boom } = require('@hapi/boom');
 
-// Save sessions in /session/auth_data/
-const sessionFolder = path.join(__dirname, './auth_data');
-if (!fs.existsSync(sessionFolder)) fs.mkdirSync(sessionFolder, { recursive: true });
+// Helper to ensure 'sessions' folder exists
+const sessionsDir = path.join(__dirname, 'sessions');
+if (!fs.existsSync(sessionsDir)) fs.mkdirSync(sessionsDir);
 
-/**
- * Starts a WhatsApp socket and returns a pairing code for login
- * @param {string} number - the phone number to create a session for
- * @returns {Promise<string>} - pairing code
- */
-async function startSocket(number) {
-  return new Promise((resolve, reject) => {
-    const sessionFile = path.join(sessionFolder, `${number}.json`);
-    const { state, saveState } = useSingleFileAuthState(sessionFile);
+async function startSocket(phoneNumber = null) {
+  const sessionFile = phoneNumber
+    ? path.join(sessionsDir, `${phoneNumber}.json`)
+    : null;
 
-    const sock = makeWASocket({
-      auth: state,
-      printQRInTerminal: false,
-      logger: P({ level: 'silent' }),
-      browser: ['SAVAGE-XMD', 'Chrome', '1.0.0']
-    });
+  const { state, saveState } = useSingleFileAuthState(
+    sessionFile || path.join(sessionsDir, `qr-session-${Date.now()}.json`)
+  );
 
-    let resolved = false;
+  const { version } = await fetchLatestBaileysVersion();
+  const store = makeInMemoryStore({});
 
-    sock.ev.on('connection.update', (update) => {
-      const { connection, lastDisconnect, pairingCode } = update;
-
-      if (pairingCode && !resolved) {
-        resolved = true;
-        return resolve(pairingCode);
-      }
-
-      if (connection === 'open') {
-        console.log(`✅ Connected: ${number}`);
-      }
-
-      if (
-        connection === 'close' &&
-        lastDisconnect &&
-        lastDisconnect.error instanceof Boom &&
-        lastDisconnect.error.output.statusCode !== DisconnectReason.loggedOut
-      ) {
-        sock.restart();
-      }
-    });
-
-    sock.ev.on('creds.update', saveState);
-
-    setTimeout(() => {
-      if (!resolved) {
-        reject(new Error('⏱️ Timed out waiting for pairing code.'));
-      }
-    }, 20000); // 20s timeout
+  const sock = makeWASocket({
+    version,
+    printQRInTerminal: false,
+    auth: state,
+    browser: ['SAVAGE-XMD', 'Safari', '1.0.0']
   });
+
+  store.bind(sock.ev);
+  sock.ev.on('creds.update', saveState);
+
+  sock.ev.on('connection.update', (update) => {
+    const { connection, lastDisconnect } = update;
+
+    if (connection === 'close') {
+      const code = lastDisconnect?.error?.output?.statusCode;
+      if (code !== DisconnectReason.loggedOut) {
+        console.log('🔁 Reconnecting...');
+        startSocket(phoneNumber); // Retry
+      } else {
+        console.log('❌ Logged out.');
+      }
+    }
+
+    if (connection === 'open') {
+      console.log(`✅ WhatsApp connected ${phoneNumber || 'via QR'}`);
+    }
+  });
+
+  return sock;
 }
 
 module.exports = startSocket;
