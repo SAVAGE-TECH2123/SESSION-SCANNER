@@ -1,58 +1,53 @@
-const {
-  default: makeWASocket,
-  useSingleFileAuthState,
-  fetchLatestBaileysVersion,
-  makeInMemoryStore,
-  DisconnectReason
-} = require('@whiskeysockets/baileys');
-const fs = require('fs');
+const { default: makeWASocket, useMultiFileAuthState } = require('@whiskeysockets/baileys');
 const path = require('path');
+const fs = require('fs');
 
-// Helper to ensure 'sessions' folder exists
-const sessionsDir = path.join(__dirname, 'sessions');
-if (!fs.existsSync(sessionsDir)) fs.mkdirSync(sessionsDir);
+const allowedNumbers = [
+  '255765457691',
+  '255793157892',
+  '255745830630',
+  '255757858480',
+  '255686169965'
+];
 
-async function startSocket(phoneNumber = null) {
-  const sessionFile = phoneNumber
-    ? path.join(sessionsDir, `${phoneNumber}.json`)
-    : null;
+async function startSocket(method, number = '') {
+  if (method === 'pairing' && !allowedNumbers.includes(number)) {
+    throw new Error('This number is not allowed for pairing');
+  }
 
-  const { state, saveState } = useSingleFileAuthState(
-    sessionFile || path.join(sessionsDir, `qr-session-${Date.now()}.json`)
-  );
+  const sessionDir = path.join(__dirname, 'sessions', number || `session-${Date.now()}`);
+  fs.mkdirSync(sessionDir, { recursive: true });
 
-  const { version } = await fetchLatestBaileysVersion();
-  const store = makeInMemoryStore({});
+  const { state, saveCreds } = await useMultiFileAuthState(sessionDir);
 
   const sock = makeWASocket({
-    version,
-    printQRInTerminal: false,
     auth: state,
-    browser: ['SAVAGE-XMD', 'Safari', '1.0.0']
+    printQRInTerminal: false,
   });
 
-  store.bind(sock.ev);
-  sock.ev.on('creds.update', saveState);
+  sock.ev.on('creds.update', saveCreds);
 
-  sock.ev.on('connection.update', (update) => {
-    const { connection, lastDisconnect } = update;
+  return new Promise((resolve, reject) => {
+    sock.ev.on('connection.update', (update) => {
+      const { qr, pairingCode, connection } = update;
 
-    if (connection === 'close') {
-      const code = lastDisconnect?.error?.output?.statusCode;
-      if (code !== DisconnectReason.loggedOut) {
-        console.log('🔁 Reconnecting...');
-        startSocket(phoneNumber); // Retry
-      } else {
-        console.log('❌ Logged out.');
+      if (connection === 'open') {
+        return resolve({ success: true });
       }
-    }
 
-    if (connection === 'open') {
-      console.log(`✅ WhatsApp connected ${phoneNumber || 'via QR'}`);
-    }
+      if (connection === 'close') {
+        return reject(new Error('Connection closed'));
+      }
+
+      if (method === 'qr' && qr) {
+        return resolve({ success: true, qr });
+      }
+
+      if (method === 'pairing' && pairingCode) {
+        return resolve({ success: true, code: pairingCode });
+      }
+    });
   });
-
-  return sock;
 }
 
 module.exports = startSocket;
