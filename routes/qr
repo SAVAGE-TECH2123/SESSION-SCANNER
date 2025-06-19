@@ -1,61 +1,35 @@
 const express = require('express');
-const { Client, NoAuth } = require('whatsapp-web.js');
 const fs = require('fs');
 const path = require('path');
 
 const router = express.Router();
 
-router.get('/:number', async (req, res) => {
-  const number = req.params.number;
+router.get('/', (req, res) => {
+  const number = req.query.number;
+  const qrFilePath = path.join(__dirname, '../../sessions', `${number}.json`);
 
-  // Validate input
-  if (!number || !/^\d+$/.test(number)) {
-    return res.status(400).send('Invalid phone number.');
+  if (!number) {
+    return res.status(400).json({ error: 'Missing number' });
   }
 
-  const sessionFile = path.join(__dirname, '..', 'sessions', `${number}.json`);
-
-  // Remove old session if exists
-  if (fs.existsSync(sessionFile)) {
-    fs.unlinkSync(sessionFile);
+  // Check if session file exists
+  if (!fs.existsSync(qrFilePath)) {
+    return res.status(404).json({ error: 'QR not generated yet or session missing' });
   }
 
-  const client = new Client({
-    authStrategy: new NoAuth(),
-    puppeteer: {
-      headless: true,
-      args: ['--no-sandbox', '--disable-setuid-sandbox']
+  // Load the QR (assumes QR was returned in session generation)
+  try {
+    const sessionData = fs.readFileSync(qrFilePath);
+    const parsed = JSON.parse(sessionData);
+
+    if (parsed && parsed.qr) {
+      res.json({ qr: parsed.qr });
+    } else {
+      res.status(404).json({ error: 'QR code not available in session file' });
     }
-  });
-
-  client.on('qr', qr => {
-    const qrURL = `https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(qr)}&size=300x300`;
-
-    res.send(`
-      <html>
-        <head>
-          <title>SAVAGE-XMD QR Scanner</title>
-        </head>
-        <body style="background:#000;color:#fff;text-align:center;font-family:sans-serif;">
-          <h1>🤖 SAVAGE-XMD</h1>
-          <p>QR Pairing for: <strong>${number}</strong></p>
-          <img src="${qrURL}" alt="QR Code"/>
-          <p>Scan using WhatsApp and wait for pairing...</p>
-        </body>
-      </html>
-    `);
-  });
-
-  client.on('authenticated', (session) => {
-    fs.writeFileSync(sessionFile, JSON.stringify(session));
-    console.log(`✅ Session saved for ${number}`);
-  });
-
-  client.on('ready', () => {
-    console.log(`Client is ready for ${number}`);
-  });
-
-  client.initialize();
+  } catch (err) {
+    res.status(500).json({ error: 'Error reading session file' });
+  }
 });
 
 module.exports = router;
