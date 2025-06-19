@@ -6,79 +6,51 @@
   <title>SAVAGE-XMD SCANNER</title>
   <style>
     body {
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      align-items: center;
-      height: 100vh;
-      margin: 0;
-      background: #f5f5f5;
+      font-family: sans-serif;
       text-align: center;
-    }
-    h1 {
-      font-size: 2em;
-      margin-bottom: 10px;
+      padding: 50px;
     }
     input {
       padding: 10px;
-      font-size: 16px;
-      width: 300px;
-      margin: 10px 0;
+      width: 250px;
     }
     button {
       padding: 10px 20px;
-      font-size: 16px;
-      background-color: #333;
-      color: white;
-      border: none;
-      cursor: pointer;
-    }
-    button:hover {
-      background-color: #555;
-    }
-    .qr-container {
-      margin-top: 20px;
     }
     .error {
       color: red;
-      margin-top: 10px;
+      margin-top: 15px;
     }
   </style>
 </head>
 <body>
-  <h1>📡 SAVAGE-XMD<br>SCANNER</h1>
+  <h1>📡 SAVAGE-XMD SCANNER</h1>
   <p>Enter your phone number to generate a new session.</p>
-  <input type="text" id="phoneNumber" placeholder="+255XXXXXXXXX"/>
+  <input id="number" placeholder="+255..." />
   <button onclick="startSession()">Start Session</button>
-
-  <div class="qr-container" id="qrCode"></div>
-  <p class="error" id="errorText"></p>
-
+  <p class="error" id="error"></p>
   <script>
     async function startSession() {
-      const phone = document.getElementById("phoneNumber").value.trim();
-      const errorText = document.getElementById("errorText");
-      const qrCode = document.getElementById("qrCode");
-      errorText.textContent = "";
-      qrCode.innerHTML = "";
-
-      if (!phone.startsWith("+255") || phone.length < 10) {
-        errorText.textContent = "❌ Invalid Tanzanian number format!";
-        return;
-      }
+      const number = document.getElementById('number').value;
+      const errorEl = document.getElementById('error');
+      errorEl.innerText = '';
 
       try {
-        const response = await fetch(`/pair?number=${encodeURIComponent(phone)}`);
+        const response = await fetch('/pairing', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ number })
+        });
+
         const data = await response.json();
 
-        if (data.qr) {
-          qrCode.innerHTML = `<img src="${data.qr}" alt="Scan this QR code"/>`;
+        if (data.pairingCode) {
+          alert("✅ Pairing Code: " + data.pairingCode);
         } else {
-          errorText.textContent = "❌ QR code not received. Please retry.";
+          throw new Error(data.error || 'Something went wrong');
         }
-      } catch (error) {
-        errorText.textContent = "❌ Error: " + error.message;
+      } catch (err) {
+        errorEl.innerText = `❌ Error: ${err.message}`;
       }
     }
   </script>
