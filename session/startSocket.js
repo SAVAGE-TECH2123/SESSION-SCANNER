@@ -2,7 +2,7 @@ const { default: makeWASocket, useSingleFileAuthState } = require('@whiskeysocke
 const { writeFileSync, existsSync, mkdirSync } = require('fs');
 const { join } = require('path');
 
-const sessionPath = './sessions';
+const sessionPath = './session';
 if (!existsSync(sessionPath)) mkdirSync(sessionPath);
 
 async function startSocket(number) {
