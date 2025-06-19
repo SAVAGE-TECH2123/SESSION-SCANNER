@@ -12,51 +12,40 @@
       text-align: center;
       padding: 20px;
     }
-
     h1 {
       color: red;
+      font-size: 28px;
     }
-
     select, input {
       padding: 10px;
       font-size: 16px;
       margin: 10px;
-      border-radius: 6px;
-      border: none;
     }
-
     button {
       background-color: red;
       color: white;
       padding: 10px 20px;
       font-size: 16px;
       border: none;
-      border-radius: 6px;
       cursor: pointer;
+      border-radius: 8px;
     }
-
-    .error, .success {
-      margin-top: 10px;
-      font-weight: bold;
-    }
-
     .error {
       color: red;
+      font-weight: bold;
     }
-
     .success {
       color: green;
+      font-weight: bold;
     }
-
     #qrDisplay img {
-      margin-top: 15px;
-      border: 2px solid #fff;
-      border-radius: 10px;
+      width: 250px;
+      margin-top: 20px;
     }
   </style>
 </head>
 <body>
-  <img src="logo.png" alt="SAVAGE-XMD Logo" style="width:150px; border-radius:12px;" />
+  <img src="logo.png" alt="SAVAGE-XMD Logo" style="width: 150px; border-radius: 12px;" />
   <h1>SAVAGE-XMD Session Scanner</h1>
 
   <p>Choose login method:</p>
@@ -66,13 +55,13 @@
   </select>
 
   <div id="pairingInput">
-    <input type="number" id="number" placeholder="Enter your allowed phone number" />
+    <input type="text" id="number" placeholder="Enter your allowed phone number" />
   </div>
 
   <button onclick="startSession()">Start Session</button>
 
-  <p class="error" id="error"></p>
   <p class="success" id="output"></p>
+  <p class="error" id="error"></p>
   <div id="qrDisplay"></div>
 
   <script>
@@ -85,7 +74,7 @@
 
     async function startSession() {
       const method = document.getElementById('method').value;
-      const number = document.getElementById('number').value;
+      const number = document.getElementById('number')?.value || '';
       const output = document.getElementById('output');
       const error = document.getElementById('error');
       const qrDisplay = document.getElementById('qrDisplay');
@@ -110,7 +99,6 @@
           } else if (method === 'qr') {
             const qr = document.createElement('img');
             qr.src = data.qr;
-            qr.style.width = '250px';
             qrDisplay.appendChild(qr);
           }
         } else {
@@ -119,6 +107,11 @@
       } catch (err) {
         error.textContent = '❌ Failed to generate session.';
       }
+    }
+
+    // Initial setup
+    if (methodSelect.value === 'qr') {
+      pairingInput.style.display = 'none';
     }
   </script>
 </body>
