@@ -1,8 +1,8 @@
 const express = require('express');
 const router = express.Router();
-const startSocket = require('../session/startSocket');
+const startSocket = require('../startSocket');
 
-// ✅ Allowed phone numbers
+// Allowed numbers list (no + sign)
 const allowedNumbers = [
   '255765457691',
   '255793157892',
@@ -11,37 +11,52 @@ const allowedNumbers = [
   '255686169965'
 ];
 
-router.post('/', async (req, res) => {
-  const { number } = req.body;
+router.post('/start', async (req, res) => {
+  const { number, method } = req.body;
 
-  // Validate phone number
-  if (!allowedNumbers.includes(number)) {
-    return res.status(403).json({
-      error: true,
-      message: '❌ This phone number is not allowed.'
-    });
+  // Validate
+  if (!method || !['pairing', 'qr'].includes(method)) {
+    return res.json({ success: false, message: 'Invalid method selected.' });
   }
 
-  try {
-    const pairingCode = await startSocket(number);
-    if (!pairingCode) {
-      return res.status(500).json({
-        error: true,
-        message: '❌ Failed to generate pairing code.'
-      });
+  if (method === 'pairing') {
+    if (!number || !allowedNumbers.includes(number)) {
+      return res.json({ success: false, message: '❌ Phone number not allowed.' });
     }
 
-    return res.status(200).json({
-      error: false,
-      message: '✅ Pairing code generated successfully.',
-      code: pairingCode
-    });
-  } catch (err) {
-    return res.status(500).json({
-      error: true,
-      message: '❌ Error generating pairing code.',
-      details: err.message
-    });
+    try {
+      const sock = await startSocket(number);
+      const code = await sock.requestPairingCode(number);
+      return res.json({ success: true, code });
+    } catch (err) {
+      console.error('❌ Pairing Error:', err);
+      return res.json({ success: false, message: '❌ Failed to generate pairing code.' });
+    }
+  }
+
+  // If method is QR
+  if (method === 'qr') {
+    try {
+      const sock = await startSocket();
+
+      // Only listen once and return QR immediately
+      sock.ev.on('connection.update', (update) => {
+        const { qr } = update;
+        if (qr) {
+          const qrImage = `https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(qr)}&size=250x250`;
+          return res.json({ success: true, qr: qrImage });
+        }
+      });
+
+      // Timeout fallback in case QR doesn't arrive
+      setTimeout(() => {
+        return res.json({ success: false, message: '❌ QR code generation timed out.' });
+      }, 10000);
+
+    } catch (err) {
+      console.error('❌ QR Error:', err);
+      return res.json({ success: false, message: '❌ Failed to generate QR code.' });
+    }
   }
 });
 
