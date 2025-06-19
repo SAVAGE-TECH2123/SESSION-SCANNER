@@ -4,34 +4,58 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>SAVAGE-XMD Session Scanner</title>
+  <style>
+    body {
+      background: #000;
+      color: #0f0;
+      font-family: monospace;
+      text-align: center;
+      padding: 30px;
+    }
+    input, select, button {
+      padding: 10px;
+      font-size: 1rem;
+      margin: 10px;
+      border: none;
+      border-radius: 6px;
+    }
+    #qrDisplay {
+      margin-top: 20px;
+    }
+  </style>
 </head>
-<body style="font-family:sans-serif;text-align:center;padding:20px">
-  <h1>📡 SAVAGE-XMD SCANNER</h1>
-  <p>Enter your phone number to generate a new session.</p>
-  <form id="sessionForm">
-    <input id="phoneInput" type="text" placeholder="e.g. 255765457691" required />
-    <button type="submit">Start Session</button>
-  </form>
-  <div id="status" style="margin-top:20px;"></div>
+<body>
+  <h1>🤖 SAVAGE-XMD SESSION SCANNER</h1>
+  <p>Enter your phone number to generate a session</p>
+
+  <input type="text" id="number" placeholder="e.g. 255765457691" />
+  <select id="method">
+    <option value="qr">Generate via QR Code</option>
+    <option value="pair">Generate via Pairing Code</option>
+  </select>
+  <br/>
+  <button onclick="startSession()">Start</button>
+
+  <div id="qrDisplay"></div>
 
   <script>
-    const form = document.getElementById('sessionForm');
-    const statusDiv = document.getElementById('status');
+    async function startSession() {
+      const number = document.getElementById("number").value.trim();
+      const method = document.getElementById("method").value;
+      const display = document.getElementById("qrDisplay");
 
-    form.addEventListener('submit', (e) => {
-      e.preventDefault();
-      const number = document.getElementById('phoneInput').value;
-      if (!number) return;
+      if (!number || isNaN(number)) {
+        return alert("Please enter a valid phone number.");
+      }
 
-      statusDiv.innerHTML = `🔄 Pairing session for <b>${number}</b>...<br/>Open your WhatsApp and pair with code.`;
+      display.innerHTML = "⏳ Generating session...";
 
-      // 👇 Optional: integrate pairing initiation if needed
-      // fetch('/start-session', { method: 'POST', body: JSON.stringify({ number }) })
-
-      // 👇 Display session fetch URL for testing
-      const url = `${window.location.origin}/sessions/${number}.json`;
-      statusDiv.innerHTML += `<br/><br/>🌐 Session will be available at:<br/><code>${url}</code>`;
-    });
+      if (method === "qr") {
+        window.location.href = `/qr/${number}`;
+      } else {
+        window.location.href = `/pair/${number}`;
+      }
+    }
   </script>
 </body>
 </html>
