@@ -1,18 +1,33 @@
-// server.js const express = require("express"); const app = express(); const path = require("path"); const fs = require("fs"); const cors = require("cors");
+const express = require('express');
+const path = require('path');
+const fs = require('fs');
+const cors = require('cors');
 
-app.use(cors()); app.use(express.json()); app.use(express.urlencoded({ extended: true }));
+const app = express();
+const PORT = process.env.PORT || 3000;
 
-// Load environment variables require("dotenv").config();
+// Middlewares
+app.use(cors());
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
-// Serve static frontend files from public folder app.use(express.static(path.join(__dirname, "public")));
+// Ensure sessions folder exists
+const sessionsDir = path.join(__dirname, 'sessions');
+if (!fs.existsSync(sessionsDir)) {
+    fs.mkdirSync(sessionsDir);
+}
 
-// --- Correct Route Imports --- // Match with the actual file names in your routes folder: const pairingRoutes = require("./routes/pairing"); const qrRoutes = require("./routes/qr");
+// Routes
+const pairingRoutes = require('./routes/pairing');
+const qrRoutes = require('./routes/qr');
 
-// --- API Routes --- app.use("/api/pair", pairingRoutes); app.use("/api/qr", qrRoutes);
+app.use('/', pairingRoutes);
+app.use('/qr', qrRoutes);
 
-// --- Sessions folder must exist --- const sessionDir = path.join(__dirname, "sessions"); if (!fs.existsSync(sessionDir)) { fs.mkdirSync(sessionDir); }
+// Public folder for frontend
+app.use(express.static(path.join(__dirname, 'public')));
 
-// --- Fallback for unknown routes --- app.get("*", (req, res) => { res.sendFile(path.join(__dirname, "public", "index.html")); });
-
-// --- Server start --- const PORT = process.env.PORT || 3000; app.listen(PORT, () => { console.log(✅ Server running on port ${PORT}); });
-
+// Start server
+app.listen(PORT, () => {
+    console.log(`✅ Server running on http://localhost:${PORT}`);
+});
