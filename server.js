@@ -1,29 +1,32 @@
-const express = require("express");
-const cors = require("cors");
-const path = require("path");
-
-const pairingRoute = require("./routes/pairing");
-const qrRoute = require("./routes/qr");
+// server.js
+const express = require('express');
+const http = require('http');
+const path = require('path');
+const socketIO = require('socket.io');
+const pairingRoute = require('./routes/pairing');
+const qrRoute = require('./routes/qr');
+const { logInfo } = require('./utils/logger');
+require('dotenv').config();
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const server = http.createServer(app);
+const io = socketIO(server);
 
-app.use(cors());
+// Middleware
 app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.static(path.join(__dirname, 'public')));
 
-// Public frontend
-app.use(express.static(path.join(__dirname, "public")));
+// Routes with socket injection
+app.use('/api/pairing', pairingRoute(io));
+app.use('/api/qr', qrRoute(io));
 
-// API routes
-app.use("/api", pairingRoute);
-app.use("/api/qr", qrRoute);
-
-// Catch all for SPA routing
-app.get("*", (req, res) => {
-  res.sendFile(path.join(__dirname, "public", "index.html"));
+// Default route
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-app.listen(PORT, () => {
-  console.log(`✅ Server running on http://localhost:${PORT}`);
+// Start server
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => {
+  logInfo(`🚀 SAVAGE-XMD Server running at http://localhost:${PORT}`);
 });
