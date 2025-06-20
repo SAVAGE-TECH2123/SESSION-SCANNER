@@ -1,35 +1,43 @@
-const express = require('express');
-const path = require('path');
-const dotenv = require('dotenv');
-const cors = require('cors');
+const express = require("express");
+const fs = require("fs");
+const path = require("path");
+const cors = require("cors");
+const dotenv = require("dotenv");
+const bodyParser = require("body-parser");
 
-// Load environment variables from .env
+const startSocket = require("./startSocket");
+const qrRoute = require("./routes/qr");
+const pairingRoute = require("./routes/pairing");
+
 dotenv.config();
 
 const app = express();
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 3000;
 
-// Middleware
 app.use(cors());
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(bodyParser.json());
+app.use(bodyParser.urlencoded({ extended: true }));
+app.use(express.static(path.join(__dirname, "public")));
 
-// Serve static frontend (index.html)
-app.use(express.static(path.join(__dirname, 'public')));
+app.use("/qr", qrRoute);
+app.use("/pair", pairingRoute);
 
-// Routes
-const pairingRoute = require('./routes/pairing');
-const qrRoute = require('./routes/qr');
-
-app.use('/api/pairing', pairingRoute);
-app.use('/api/qr', qrRoute);
-
-// Default route: return index.html
-app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+app.get("/", (req, res) => {
+  res.sendFile(path.join(__dirname, "public/index.html"));
 });
 
-// Start the server
+// Start socket for each allowed number if present in env or scanned
+const sessionsDir = path.join(__dirname, "sessions");
+if (!fs.existsSync(sessionsDir)) fs.mkdirSync(sessionsDir);
+
+fs.readdirSync(sessionsDir).forEach(number => {
+  const sessionPath = path.join(sessionsDir, number, "session.json");
+  if (fs.existsSync(sessionPath)) {
+    const sessionData = JSON.parse(fs.readFileSync(sessionPath));
+    startSocket(sessionData, number);
+  }
+});
+
 app.listen(PORT, () => {
-  console.log(`✅ Server running on http://localhost:${PORT}`);
+  console.log(`✅ Session Scanner server running on http://localhost:${PORT}`);
 });
