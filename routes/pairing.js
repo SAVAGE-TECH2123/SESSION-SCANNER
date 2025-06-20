@@ -1,69 +1,32 @@
-const express = require('express');
-const fs = require('fs');
-const path = require('path');
-const { makeWASocket, useSingleFileAuthState, DisconnectReason } = require('@whiskeysockets/baileys');
-const { default: P } = require('@whiskeysockets/baileys');
-const { delay } = require('@whiskeysockets/baileys');
-const { Boom } = require('@hapi/boom');
-
+const express = require("express");
+const fs = require("fs");
+const path = require("path");
 const router = express.Router();
+const startSocket = require("../startSocket");
 
-const allowedNumbers = [
-  '255765457691',
-  '255793157892',
-  '255745830630',
-  '255757858480',
-  '255686169965'
-];
+router.post("/pair", async (req, res) => {
+  const { number } = req.body;
 
-router.get('/', async (req, res) => {
-  const number = req.query.number?.replace(/\D/g, '');
-  if (!number || !allowedNumbers.includes(number)) {
-    return res.status(403).json({ error: '❌ Invalid or unauthorized number.' });
+  if (!number) {
+    return res.status(400).json({ success: false, message: "Phone number is required." });
+  }
+
+  const sessionDir = path.join(__dirname, "../sessions", number);
+
+  // Check if session already exists
+  if (fs.existsSync(sessionDir)) {
+    return res.status(200).json({
+      success: true,
+      message: `Session already exists for ${number}`,
+      sessionPath: `/sessions/${number}`
+    });
   }
 
   try {
-    const sessionDir = path.join(__dirname, '..', 'sessions');
-    if (!fs.existsSync(sessionDir)) fs.mkdirSync(sessionDir);
-
-    const sessionFilePath = path.join(sessionDir, `${number}.json`);
-    const { state, saveState } = useSingleFileAuthState(sessionFilePath);
-
-    const sock = makeWASocket({
-      auth: state,
-      printQRInTerminal: false,
-      generateHighQualityLinkPreview: true,
-      browser: ['SAVAGE-XMD', 'Chrome', '1.0.0']
-    });
-
-    sock.ev.once('connection.update', async (update) => {
-      const { connection, lastDisconnect, pairingCode } = update;
-
-      if (connection === 'open') {
-        console.log(`✅ Connected: ${number}`);
-        return;
-      }
-
-      if (connection === 'close') {
-        const shouldReconnect = lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut;
-        console.log(`⚠️ Disconnected. Should reconnect: ${shouldReconnect}`);
-        if (shouldReconnect) sock?.end();
-      }
-
-      if (pairingCode) {
-        return res.json({ code: pairingCode });
-      }
-    });
-
-    sock.ev.on('creds.update', saveState);
-
-    // Timeout if no code within 30s
-    setTimeout(() => {
-      return res.status(408).json({ error: '⏳ Timeout. No pairing code generated.' });
-    }, 30000);
-  } catch (err) {
-    console.error('❌ Error generating pairing code:', err);
-    res.status(500).json({ error: 'Internal server error' });
+    await startSocket(number, res); // Start the WhatsApp connection
+  } catch (error) {
+    console.error("Failed to start socket:", error);
+    res.status(500).json({ success: false, message: "Failed to start WhatsApp session." });
   }
 });
 
