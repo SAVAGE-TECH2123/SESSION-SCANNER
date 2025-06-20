@@ -1,21 +1,20 @@
-const express = require("express");
+// routes/qr.js
+const express = require('express');
+const startSocket = require('../startSocket');
 const router = express.Router();
-const qrcode = require("qrcode");
 
-router.get("/generate", async (req, res) => {
-  const { text } = req.query;
+module.exports = (io) => {
+  router.get('/', async (req, res) => {
+    try {
+      // No number needed for QR session — it will use a default session
+      await startSocket(io, res, null, 'qr');
 
-  if (!text) {
-    return res.status(400).json({ error: "Missing text parameter" });
-  }
+      // Success response will be sent inside startSocket after session connects
+    } catch (err) {
+      console.error('[QR Error]:', err);
+      res.status(500).json({ error: 'Failed to start QR session.' });
+    }
+  });
 
-  try {
-    const qrImage = await qrcode.toDataURL(text);
-    res.status(200).json({ image: qrImage });
-  } catch (err) {
-    console.error("QR Generation Error:", err);
-    res.status(500).json({ error: "Failed to generate QR code" });
-  }
-});
-
-module.exports = router;
+  return router;
+};
